@@ -4,7 +4,8 @@
       "description": "Sistema de gestão para transportadora",
       "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1",
-        "start-backend": "node index.js"
+        "start-backend": "node index.js",
+        "build": "npm install" 
       },
       "keywords": [],
       "author": "Seu Nome <seu.email@example.com>",
@@ -18,4 +19,3 @@
       "devDependencies": {
       }
     }
-    
