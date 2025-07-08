@@ -3,4 +3,4 @@
     *.db           # Ignorar o arquivo do banco de dados local
     npm-debug.log
     .env           # Se você adicionar um arquivo .env para variáveis de ambiente
-    
+    frontend/      # Ignorar a pasta do frontend
