@@ -8,7 +8,7 @@ const app = express();
 // Configuração CORS - CRUCIAL para o frontend no Vercel
 // ATENÇÃO: Substitua 'https://sua-url-do-frontend.vercel.app' pela URL REAL do seu site Vercel
 const corsOptions = {
-  origin: "https://sua-url-do-frontend.vercel.app", // EX: 'https://broto-frontend-xyz.vercel.app'
+  origin: "https://broto-frontend.vercel.app", // <-- AGORA ESTÁ CORRETO!
   methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
   credentials: true,
   optionsSuccessStatus: 204,
