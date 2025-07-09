@@ -47,7 +47,7 @@ app.post("/motoristas", async (req, res) => {
     );
     res.status(201).json({ id: result.rows[0].id, nome, cnh, telefone });
   } catch (err) {
-    if (err.code === '23505') {
+    if (err.code === '23505') { // Código de erro para violação de UNIQUE constraint no PostgreSQL
       return res.status(409).json({ erro: "Motorista com este nome ou CNH já cadastrado." });
     }
     console.error("Erro no DB ao cadastrar motorista:", err.message);
@@ -87,7 +87,7 @@ app.post("/caminhoes", async (req, res) => {
     );
     res.status(201).json({ id: result.rows[0].id, placa: placa.toUpperCase(), status_atual: status });
   } catch (err) {
-    if (err.code === '23505') {
+    if (err.code === '23505') { // Código de erro para violação de UNIQUE constraint no PostgreSQL
       return res.status(409).json({ erro: "Esta placa já está cadastrada." });
     }
     console.error("Erro no DB ao cadastrar caminhão:", err.message);
