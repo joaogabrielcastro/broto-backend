@@ -354,24 +354,31 @@ app.get("/viagens/ativas", async (req, res) => {
 // Listar viagens finalizadas - MOVIDA PARA ANTES DE /viagens/:placa
 app.get("/viagens/finalizadas", async (req, res) => {
   const sql = `
-    SELECT
-      v.id, v.inicio, v.fim, v.frete, v.lucro_total, v.data_termino, v.status,
-      c.placa,
-      m.nome as motorista_nome,
-      v.origem,
-      v.destino
-    FROM viagens v
-    JOIN caminhoes c ON v.caminhao_id = c.id
-    JOIN motoristas m ON v.motorista_id = m.id
-    WHERE v.status = 'Finalizada'
-  `;
+        SELECT
+          v.id, v.inicio, v.fim, v.frete, v.lucro_total, v.data_termino, v.status,
+          c.placa,
+          -- m.nome as motorista_nome, -- COMENTADO TEMPORARIAMENTE
+          v.origem,
+          v.destino
+        FROM viagens v
+        JOIN caminhoes c ON v.caminhao_id = c.id
+        -- JOIN motoristas m ON v.motorista_id = m.id -- COMENTADO TEMPORARIAMENTE
+        WHERE v.status = 'Finalizada'
+      `;
 
   try {
     const result = await db.query(sql);
     res.status(200).json(result.rows);
   } catch (err) {
-    console.error("Erro no DB ao listar viagens finalizadas:", err.message);
-    res.status(500).json({ erro: err.message });
+    console.error(
+      "Erro no DB ao listar viagens finalizadas (temp):",
+      err.message
+    );
+    res
+      .status(500)
+      .json({
+        erro: "Erro interno do servidor ao listar viagens finalizadas (temp).",
+      });
   }
 });
 
