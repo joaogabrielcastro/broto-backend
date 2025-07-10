@@ -34,7 +34,6 @@ async function initializeDatabase() {
       CREATE TABLE IF NOT EXISTS motoristas (
         id SERIAL PRIMARY KEY,
         nome VARCHAR(255) NOT NULL UNIQUE,
-        -- cnh VARCHAR(20) UNIQUE, -- CNH REMOVIDA
         telefone VARCHAR(20)
       );
     `);
