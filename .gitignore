@@ -3,4 +3,4 @@ dist-electron/ # Se ainda existir, para garantir
 *.db           # Ignorar o arquivo do banco de dados local
 npm-debug.log
 .env           # Se você adicionar um arquivo .env para variáveis de ambiente
-frontend/      # <--- Esta linha é crucial
+frontend/      # Ignorar a pasta frontend

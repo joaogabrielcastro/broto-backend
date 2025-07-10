@@ -1,6 +1,6 @@
 const express = require("express");
 const cors = require("cors");
-const db = require("./database"); 
+const db = require("./src/database"); 
 
 const app = express();
 
@@ -87,7 +87,7 @@ app.post("/caminhoes", async (req, res) => {
     );
     res.status(201).json({ id: result.rows[0].id, placa: placa.toUpperCase(), status_atual: status });
   } catch (err) {
-    if (err.code === '23505') { // Código de erro para violação de UNIQUE constraint no PostgreSQL
+    if (err.code === '23505') {
       return res.status(409).json({ erro: "Esta placa já está cadastrada." });
     }
     console.error("Erro no DB ao cadastrar caminhão:", err.message);
@@ -95,7 +95,7 @@ app.post("/caminhoes", async (req, res) => {
   }
 });
 
-// Listar todos os caminhões
+// Listar todos os caminhões (mantida)
 app.get("/caminhoes", async (req, res) => {
   try {
     const result = await db.query("SELECT * FROM caminhoes");
