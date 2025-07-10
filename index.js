@@ -1,6 +1,6 @@
 const express = require("express");
 const cors = require("cors");
-const db = require("./src/database"); 
+const db = require("./database"); 
 
 const app = express();
 
@@ -26,39 +26,42 @@ app.get("/", async (req, res) => {
 });
 
 // **********************************************
-// NOVAS ROTAS PARA MOTORISTAS
+// NOVAS ROTAS PARA MOTORISTAS - ATUALIZADAS (SEM CNH)
 // **********************************************
 
-// 6. Cadastrar motorista
+// 6. Cadastrar motorista - SEM CNH
 app.post("/motoristas", async (req, res) => {
-  const { nome, cnh, telefone } = req.body;
+  const { nome, telefone } = req.body; // CNH REMOVIDA
 
   if (!nome || typeof nome !== 'string' || nome.trim() === '') {
     return res.status(400).json({ erro: "O nome do motorista é obrigatório." });
   }
-  if (!cnh || typeof cnh !== 'string' || cnh.trim() === '') {
-    return res.status(400).json({ erro: "A CNH do motorista é obrigatória." });
-  }
+  // Validação da CNH REMOVIDA
+  // if (!cnh || typeof cnh !== 'string' || cnh.trim() === '') {
+  //   return res.status(400).json({ erro: "A CNH do motorista é obrigatória." });
+  // }
 
   try {
+    // CNH REMOVIDA da query
     const result = await db.query(
-      `INSERT INTO motoristas (nome, cnh, telefone) VALUES ($1, $2, $3) RETURNING id`,
-      [nome, cnh, telefone]
+      `INSERT INTO motoristas (nome, telefone) VALUES ($1, $2) RETURNING id`,
+      [nome, telefone]
     );
-    res.status(201).json({ id: result.rows[0].id, nome, cnh, telefone });
+    res.status(201).json({ id: result.rows[0].id, nome, telefone }); // CNH REMOVIDA do retorno
   } catch (err) {
-    if (err.code === '23505') { // Código de erro para violação de UNIQUE constraint no PostgreSQL
-      return res.status(409).json({ erro: "Motorista com este nome ou CNH já cadastrado." });
+    if (err.code === '23505') { // Código de erro para violação de UNIQUE constraint no PostgreSQL (se nome for UNIQUE)
+      return res.status(409).json({ erro: "Motorista com este nome já cadastrado." }); // Mensagem ajustada
     }
     console.error("Erro no DB ao cadastrar motorista:", err.message);
     res.status(500).json({ erro: "Erro interno do servidor ao cadastrar motorista." });
   }
 });
 
-// Listar todos os motoristas
+// Listar todos os motoristas - SEM CNH
 app.get("/motoristas", async (req, res) => {
   try {
-    const result = await db.query("SELECT id, nome, cnh, telefone FROM motoristas");
+    // CNH REMOVIDA da query
+    const result = await db.query("SELECT id, nome, telefone FROM motoristas");
     res.status(200).json(result.rows);
   } catch (err) {
     console.error("Erro no DB ao listar motoristas:", err.message);
@@ -66,8 +69,36 @@ app.get("/motoristas", async (req, res) => {
   }
 });
 
+// Rota para excluir motorista (mantida, pois usa apenas o ID)
+app.delete("/motoristas/:id", async (req, res) => {
+  const id = req.params.id;
+
+  if (isNaN(parseInt(id))) {
+    return res.status(400).json({ erro: "ID do motorista inválido." });
+  }
+
+  try {
+    // Verifica se o motorista está associado a alguma viagem
+    const checkViagens = await db.query(`SELECT COUNT(*) FROM viagens WHERE motorista_id = $1`, [id]);
+    if (parseInt(checkViagens.rows[0].count) > 0) {
+      return res.status(409).json({ erro: "Não é possível excluir o motorista pois ele está associado a viagens." });
+    }
+
+    const result = await db.query(`DELETE FROM motoristas WHERE id = $1`, [id]);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ erro: "Motorista não encontrado para exclusão." });
+    }
+    res.status(200).json({ excluido: true, id: id });
+  } catch (err) {
+    console.error("Erro no DB ao excluir motorista:", err.message);
+    res.status(500).json({ erro: "Erro interno do servidor ao excluir motorista." });
+  }
+});
+
 // **********************************************
-// ROTAS EXISTENTES (Caminhões e Viagens) - ATUALIZADAS
+// ROTAS EXISTENTES (Caminhões e Viagens) - MANTIDAS
+// (Não afetam CNH diretamente, mas as queries de JOIN já não selecionam CNH)
 // **********************************************
 
 // 1. Cadastrar caminhão
@@ -87,7 +118,7 @@ app.post("/caminhoes", async (req, res) => {
     );
     res.status(201).json({ id: result.rows[0].id, placa: placa.toUpperCase(), status_atual: status });
   } catch (err) {
-    if (err.code === '23505') { // Código de erro para violação de UNIQUE constraint no PostgreSQL
+    if (err.code === '23505') {
       return res.status(409).json({ erro: "Esta placa já está cadastrada." });
     }
     console.error("Erro no DB ao cadastrar caminhão:", err.message);
@@ -95,7 +126,7 @@ app.post("/caminhoes", async (req, res) => {
   }
 });
 
-// Listar todos os caminhões (mantida)
+// Listar todos os caminhões
 app.get("/caminhoes", async (req, res) => {
   try {
     const result = await db.query("SELECT * FROM caminhoes");
@@ -165,17 +196,6 @@ app.post("/viagens", async (req, res) => {
   } catch (err) {
     console.error("Erro no DB ao cadastrar viagem:", err.message);
     res.status(500).json({ erro: "Erro interno do servidor ao cadastrar viagem." });
-  }
-});
-
-// Listar todos os caminhões (mantida)
-app.get("/caminhoes", async (req, res) => {
-  try {
-    const result = await db.query("SELECT * FROM caminhoes");
-    res.status(200).json(result.rows);
-  } catch (err) {
-    console.error("Erro no DB ao listar caminhões:", err.message);
-    res.status(500).json({ erro: err.message });
   }
 });
 
