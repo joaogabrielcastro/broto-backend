@@ -1,6 +1,6 @@
 const express = require("express");
 const cors = require("cors");
-const db = require("./database"); 
+const db = require("./src/database"); 
 
 const app = express();
 
@@ -44,7 +44,7 @@ app.post("/motoristas", async (req, res) => {
     );
     res.status(201).json({ id: result.rows[0].id, nome, telefone });
   } catch (err) {
-    if (err.code === '23505') {
+    if (err.code === '23505') { // Código de erro para violação de UNIQUE constraint no PostgreSQL
       return res.status(409).json({ erro: "Motorista com este nome já cadastrado." });
     }
     console.error("Erro no DB ao cadastrar motorista:", err.message);
@@ -295,35 +295,6 @@ app.get("/viagens-por-placa/:placa", async (req, res) => { // ROTA RENOMEADA
   }
 });
 
-// Nova rota para listar TODAS as viagens (se necessário para algum dashboard, etc.) - ATUALIZADA com motorista e rota
-/*
-app.get("/viagens/todas", async (req, res) => {
-  const sql = `
-    SELECT
-      v.id, v.inicio, v.fim, v.frete, v.lucro_total, v.data_termino, v.status,
-      c.placa,
-      m.nome as motorista_nome,
-      v.origem,
-      v.destino
-    FROM viagens v
-    JOIN caminhoes c ON v.caminhao_id = c.id
-    JOIN motoristas m ON v.motorista_id = m.id
-  `;
-  try {
-    const result = await db.query(sql);
-    res.status(200).json(result.rows);
-  } catch (err) {
-    console.error("Erro no DB ao listar todas as viagens:", err.message);
-    res.status(500).json({ erro: "Erro interno do servidor ao listar todas as viagens." });
-  }
-});
-*/
-
-// 5. Produtividade (Lucro ou Prejuízo) - ATUALIZADA com motorista e rota (para exibir, se quiser)
-// ROTA REMOVIDA: app.get("/relatorio-produtividade", ...)
-// Se o frontend não vai mais chamar essa rota, ela pode ser removida do backend.
-
-// Editar viagem (PUT) - ATUALIZADA com motorista_id, origem, destino
 app.put("/viagens/:id", async (req, res) => {
   const id = req.params.id;
   let { inicio, fim, frete, lucro_total, status, motorista_id, origem, destino } = req.body;
