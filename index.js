@@ -26,7 +26,7 @@ app.get("/", async (req, res) => {
 });
 
 // **********************************************
-// NOVAS ROTAS PARA MOTORISTAS - ATUALIZADAS (SEM CNH)
+// NOVAS ROTAS PARA MOTORISTAS
 // **********************************************
 
 // 6. Cadastrar motorista - SEM CNH
@@ -36,21 +36,16 @@ app.post("/motoristas", async (req, res) => {
   if (!nome || typeof nome !== 'string' || nome.trim() === '') {
     return res.status(400).json({ erro: "O nome do motorista é obrigatório." });
   }
-  // Validação da CNH REMOVIDA
-  // if (!cnh || typeof cnh !== 'string' || cnh.trim() === '') {
-  //   return res.status(400).json({ erro: "A CNH do motorista é obrigatória." });
-  // }
 
   try {
-    // CNH REMOVIDA da query
     const result = await db.query(
       `INSERT INTO motoristas (nome, telefone) VALUES ($1, $2) RETURNING id`,
       [nome, telefone]
     );
-    res.status(201).json({ id: result.rows[0].id, nome, telefone }); // CNH REMOVIDA do retorno
+    res.status(201).json({ id: result.rows[0].id, nome, telefone });
   } catch (err) {
-    if (err.code === '23505') { // Código de erro para violação de UNIQUE constraint no PostgreSQL (se nome for UNIQUE)
-      return res.status(409).json({ erro: "Motorista com este nome já cadastrado." }); // Mensagem ajustada
+    if (err.code === '23505') {
+      return res.status(409).json({ erro: "Motorista com este nome já cadastrado." });
     }
     console.error("Erro no DB ao cadastrar motorista:", err.message);
     res.status(500).json({ erro: "Erro interno do servidor ao cadastrar motorista." });
@@ -60,7 +55,6 @@ app.post("/motoristas", async (req, res) => {
 // Listar todos os motoristas - SEM CNH
 app.get("/motoristas", async (req, res) => {
   try {
-    // CNH REMOVIDA da query
     const result = await db.query("SELECT id, nome, telefone FROM motoristas");
     res.status(200).json(result.rows);
   } catch (err) {
@@ -78,7 +72,6 @@ app.delete("/motoristas/:id", async (req, res) => {
   }
 
   try {
-    // Verifica se o motorista está associado a alguma viagem
     const checkViagens = await db.query(`SELECT COUNT(*) FROM viagens WHERE motorista_id = $1`, [id]);
     if (parseInt(checkViagens.rows[0].count) > 0) {
       return res.status(409).json({ erro: "Não é possível excluir o motorista pois ele está associado a viagens." });
@@ -98,7 +91,6 @@ app.delete("/motoristas/:id", async (req, res) => {
 
 // **********************************************
 // ROTAS EXISTENTES (Caminhões e Viagens) - MANTIDAS
-// (Não afetam CNH diretamente, mas as queries de JOIN já não selecionam CNH)
 // **********************************************
 
 // 1. Cadastrar caminhão
