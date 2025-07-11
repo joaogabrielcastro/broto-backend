@@ -26,12 +26,54 @@ app.get("/", async (req, res) => {
 });
 
 // **********************************************
-// NOVAS ROTAS PARA MOTORISTAS
+// NOVAS ROTAS PARA CLIENTES
+// **********************************************
+
+// 7. Cadastrar cliente
+app.post("/clientes", async (req, res) => {
+  const { nome, telefone, email, endereco } = req.body;
+
+  if (!nome || typeof nome !== 'string' || nome.trim() === '') {
+    return res.status(400).json({ erro: "O nome do cliente é obrigatório." });
+  }
+  if (!email || typeof email !== 'string' || email.trim() === '') {
+    return res.status(400).json({ erro: "O email do cliente é obrigatório." });
+  }
+  // Validação de formato de email mais robusta pode ser adicionada aqui
+
+  try {
+    const result = await db.query(
+      `INSERT INTO clientes (nome, telefone, email, endereco) VALUES ($1, $2, $3, $4) RETURNING id`,
+      [nome, telefone, email, endereco]
+    );
+    res.status(201).json({ id: result.rows[0].id, nome, telefone, email, endereco });
+  } catch (err) {
+    if (err.code === '23505') { // Código de erro para violação de UNIQUE constraint no PostgreSQL (se email for UNIQUE)
+      return res.status(409).json({ erro: "Cliente com este email já cadastrado." });
+    }
+    console.error("Erro no DB ao cadastrar cliente:", err.message);
+    res.status(500).json({ erro: "Erro interno do servidor ao cadastrar cliente." });
+  }
+});
+
+// Listar todos os clientes
+app.get("/clientes", async (req, res) => {
+  try {
+    const result = await db.query("SELECT id, nome, telefone, email, endereco FROM clientes");
+    res.status(200).json(result.rows);
+  } catch (err) {
+    console.error("Erro no DB ao listar clientes:", err.message);
+    res.status(500).json({ erro: err.message });
+  }
+});
+
+// **********************************************
+// NOVAS ROTAS PARA MOTORISTAS - ATUALIZADAS (SEM CNH)
 // **********************************************
 
 // 6. Cadastrar motorista - SEM CNH
 app.post("/motoristas", async (req, res) => {
-  const { nome, telefone } = req.body; // CNH REMOVIDA
+  const { nome, telefone } = req.body;
 
   if (!nome || typeof nome !== 'string' || nome.trim() === '') {
     return res.status(400).json({ erro: "O nome do motorista é obrigatório." });
@@ -44,7 +86,7 @@ app.post("/motoristas", async (req, res) => {
     );
     res.status(201).json({ id: result.rows[0].id, nome, telefone });
   } catch (err) {
-    if (err.code === '23505') { // Código de erro para violação de UNIQUE constraint no PostgreSQL
+    if (err.code === '23505') {
       return res.status(409).json({ erro: "Motorista com este nome já cadastrado." });
     }
     console.error("Erro no DB ao cadastrar motorista:", err.message);
@@ -90,7 +132,7 @@ app.delete("/motoristas/:id", async (req, res) => {
 });
 
 // **********************************************
-// ROTAS EXISTENTES (Caminhões e Viagens) - MANTIDAS
+// ROTAS EXISTENTES (Caminhões e Viagens) - ATUALIZADAS (COM CLIENTE_ID)
 // **********************************************
 
 // 1. Cadastrar caminhão
@@ -129,9 +171,9 @@ app.get("/caminhoes", async (req, res) => {
   }
 });
 
-// 2. Cadastrar viagem
+// 2. Cadastrar viagem - ATUALIZADA com cliente_id
 app.post("/viagens", async (req, res) => {
-  let { placa, motorista_id, inicio, fim, origem, destino, frete, lucro_total, data_termino, status } = req.body;
+  let { placa, motorista_id, cliente_id, inicio, fim, origem, destino, frete, lucro_total, data_termino, status } = req.body; // CLIENTE_ID ADICIONADO
 
   // Validação de entrada
   if (!placa || typeof placa !== 'string' || placa.trim() === '') {
@@ -139,6 +181,9 @@ app.post("/viagens", async (req, res) => {
   }
   if (isNaN(parseInt(motorista_id))) {
     return res.status(400).json({ erro: "O motorista é obrigatório para a viagem." });
+  }
+  if (isNaN(parseInt(cliente_id))) { // VALIDAÇÃO DO CLIENTE_ID
+    return res.status(400).json({ erro: "O cliente é obrigatório para a viagem." });
   }
   if (!inicio || typeof inicio !== 'string' || inicio.trim() === '') {
     return res.status(400).json({ erro: "A data de início da viagem é obrigatória." });
@@ -163,6 +208,7 @@ app.post("/viagens", async (req, res) => {
   }
 
   motorista_id = parseInt(motorista_id);
+  cliente_id = parseInt(cliente_id); // Converte para inteiro
   frete = parseFloat(frete);
   lucro_total = parseFloat(lucro_total);
   placa = placa.toUpperCase();
@@ -179,20 +225,25 @@ app.post("/viagens", async (req, res) => {
       return res.status(404).json({ erro: "Motorista não encontrado para o ID informado." });
     }
 
+    const clienteResult = await db.query(`SELECT id FROM clientes WHERE id = $1`, [cliente_id]); // VERIFICA CLIENTE
+    if (clienteResult.rows.length === 0) {
+      return res.status(404).json({ erro: "Cliente não encontrado para o ID informado." });
+    }
+
     const result = await db.query(
-      `INSERT INTO viagens (caminhao_id, motorista_id, inicio, fim, origem, destino, frete, lucro_total, data_termino, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
-      [caminhao_id, motorista_id, inicio, fim, origem, destino, frete, lucro_total, data_termino, status]
+      `INSERT INTO viagens (caminhao_id, motorista_id, cliente_id, inicio, fim, origem, destino, frete, lucro_total, data_termino, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`, // ATUALIZADO PARA 11 PARÂMETROS
+      [caminhao_id, motorista_id, cliente_id, inicio, fim, origem, destino, frete, lucro_total, data_termino, status]
     );
-    res.status(201).json({ id: result.rows[0].id, caminhao_id, motorista_id, inicio, fim, origem, destino, frete, lucro_total, data_termino, status });
+    res.status(201).json({ id: result.rows[0].id, caminhao_id, motorista_id, cliente_id, inicio, fim, origem, destino, frete, lucro_total, data_termino, status });
   } catch (err) {
     console.error("Erro no DB ao cadastrar viagem:", err.message);
     res.status(500).json({ erro: "Erro interno do servidor ao cadastrar viagem." });
   }
 });
 
-// 4. Situação atual dos caminhões (viagens em andamento) - ATUALIZADA com motorista e rota
-app.get("/situacao-atual-caminhoes", async (req, res) => { // ROTA RENOMEADA
+// 4. Situação atual dos caminhões (viagens em andamento) - ATUALIZADA com motorista e rota + CLIENTE
+app.get("/situacao-atual-caminhoes", async (req, res) => {
   const sql = `
     SELECT
       c.placa,
@@ -201,10 +252,12 @@ app.get("/situacao-atual-caminhoes", async (req, res) => { // ROTA RENOMEADA
       v.status,
       v.origem,
       v.destino,
-      m.nome as motorista_nome
+      m.nome as motorista_nome,
+      cl.nome as cliente_nome -- NOVO CAMPO
     FROM caminhoes c
     JOIN viagens v ON c.id = v.caminhao_id
     JOIN motoristas m ON v.motorista_id = m.id
+    JOIN clientes cl ON v.cliente_id = cl.id -- NOVO JOIN
     WHERE v.status = 'Em andamento'
   `;
   try {
@@ -216,18 +269,20 @@ app.get("/situacao-atual-caminhoes", async (req, res) => { // ROTA RENOMEADA
   }
 });
 
-// Listar viagens em andamento (já existente e clara) - ATUALIZADA com motorista e rota - MOVIDA PARA ANTES DE /viagens/:placa
-app.get("/viagens-ativas-lista", async (req, res) => { // ROTA RENOMEADA
+// Listar viagens em andamento (já existente e clara) - ATUALIZADA com motorista e rota + CLIENTE
+app.get("/viagens-ativas-lista", async (req, res) => {
   const sql = `
     SELECT
       v.id, v.inicio, v.fim, v.frete, v.lucro_total, v.data_termino, v.status,
       c.placa,
       m.nome as motorista_nome,
       v.origem,
-      v.destino
+      v.destino,
+      cl.nome as cliente_nome -- NOVO CAMPO
     FROM viagens v
     JOIN caminhoes c ON v.caminhao_id = c.id
     JOIN motoristas m ON v.motorista_id = m.id
+    JOIN clientes cl ON v.cliente_id = cl.id -- NOVO JOIN
     WHERE v.status = 'Em andamento'
   `;
   try {
@@ -239,18 +294,20 @@ app.get("/viagens-ativas-lista", async (req, res) => { // ROTA RENOMEADA
   }
 });
 
-// Listar viagens finalizadas - ATUALIZADA com motorista e rota - MOVIDA PARA ANTES DE /viagens/:placa
-app.get("/viagens-finalizadas-lista", async (req, res) => { // ROTA RENOMEADA
+// Listar viagens finalizadas - ATUALIZADA com motorista e rota + CLIENTE
+app.get("/viagens-finalizadas-lista", async (req, res) => {
   const sql = `
     SELECT
       v.id, v.inicio, v.fim, v.frete, v.lucro_total, v.data_termino, v.status,
       c.placa,
       m.nome as motorista_nome,
       v.origem,
-      v.destino
+      v.destino,
+      cl.nome as cliente_nome -- NOVO CAMPO
     FROM viagens v
     JOIN caminhoes c ON v.caminhao_id = c.id
     JOIN motoristas m ON v.motorista_id = m.id
+    JOIN clientes cl ON v.cliente_id = cl.id -- NOVO JOIN
     WHERE v.status = 'Finalizada'
   `;
 
@@ -263,8 +320,8 @@ app.get("/viagens-finalizadas-lista", async (req, res) => { // ROTA RENOMEADA
   }
 });
 
-// 3. Buscar viagens por placa - ATUALIZADA com motorista e rota - MOVIDA PARA DEPOIS DAS ROTAS FIXAS /viagens/XYZ
-app.get("/viagens-por-placa/:placa", async (req, res) => { // ROTA RENOMEADA
+// 3. Buscar viagens por placa - ATUALIZADA com motorista e rota + CLIENTE
+app.get("/viagens-por-placa/:placa", async (req, res) => {
   const { placa } = req.params;
 
   if (!placa || typeof placa !== 'string' || placa.trim() === '') {
@@ -282,9 +339,11 @@ app.get("/viagens-por-placa/:placa", async (req, res) => { // ROTA RENOMEADA
       SELECT
         v.id, v.inicio, v.fim, v.frete, v.lucro_total, v.data_termino, v.status,
         v.origem, v.destino,
-        m.nome as motorista_nome
+        m.nome as motorista_nome,
+        cl.nome as cliente_nome -- NOVO CAMPO
       FROM viagens v
       JOIN motoristas m ON v.motorista_id = m.id
+      JOIN clientes cl ON v.cliente_id = cl.id -- NOVO JOIN
       WHERE v.caminhao_id = $1
     `;
     const result = await db.query(sql, [caminhao_id]);
@@ -295,9 +354,36 @@ app.get("/viagens-por-placa/:placa", async (req, res) => { // ROTA RENOMEADA
   }
 });
 
+// Nova rota para listar TODAS as viagens (se necessário para algum dashboard, etc.) - ATUALIZADA com motorista e rota + CLIENTE
+/*
+app.get("/viagens/todas", async (req, res) => {
+  const sql = `
+    SELECT
+      v.id, v.inicio, v.fim, v.frete, v.lucro_total, v.data_termino, v.status,
+      c.placa,
+      m.nome as motorista_nome,
+      v.origem,
+      v.destino,
+      cl.nome as cliente_nome
+    FROM viagens v
+    JOIN caminhoes c ON v.caminhao_id = c.id
+    JOIN motoristas m ON v.motorista_id = m.id
+    JOIN clientes cl ON v.cliente_id = cl.id
+  `;
+  try {
+    const result = await db.query(sql);
+    res.status(200).json(result.rows);
+  } catch (err) {
+    console.error("Erro no DB ao listar todas as viagens:", err.message);
+    res.status(500).json({ erro: "Erro interno do servidor ao listar todas as viagens." });
+  }
+});
+*/
+
+// Editar viagem (PUT) - ATUALIZADA com motorista_id, origem, destino + CLIENTE_ID
 app.put("/viagens/:id", async (req, res) => {
   const id = req.params.id;
-  let { inicio, fim, frete, lucro_total, status, motorista_id, origem, destino } = req.body;
+  let { inicio, fim, frete, lucro_total, status, motorista_id, cliente_id, origem, destino } = req.body; // CLIENTE_ID ADICIONADO
 
   // Validação de entrada
   if (isNaN(parseInt(id))) {
@@ -321,6 +407,9 @@ app.put("/viagens/:id", async (req, res) => {
   if (isNaN(parseInt(motorista_id))) {
     return res.status(400).json({ erro: "O motorista é obrigatório para a edição da viagem." });
   }
+  if (isNaN(parseInt(cliente_id))) { // VALIDAÇÃO DO CLIENTE_ID
+    return res.status(400).json({ erro: "O cliente é obrigatório para a edição da viagem." });
+  }
   if (!origem || typeof origem !== 'string' || origem.trim() === '') {
     return res.status(400).json({ erro: "A origem da viagem é obrigatória para a edição." });
   }
@@ -329,6 +418,7 @@ app.put("/viagens/:id", async (req, res) => {
   }
 
   motorista_id = parseInt(motorista_id);
+  cliente_id = parseInt(cliente_id); // Converte para inteiro
   frete = parseFloat(frete);
   lucro_total = parseFloat(lucro_total);
 
@@ -338,9 +428,14 @@ app.put("/viagens/:id", async (req, res) => {
     if (motoristaResult.rows.length === 0) {
       return res.status(404).json({ erro: "Motorista não encontrado para o ID fornecido na edição." });
     }
+    // Antes de atualizar, verificar se o cliente_id existe
+    const clienteResult = await db.query(`SELECT id FROM clientes WHERE id = $1`, [cliente_id]);
+    if (clienteResult.rows.length === 0) {
+      return res.status(404).json({ erro: "Cliente não encontrado para o ID fornecido na edição." });
+    }
 
-    const sql = `UPDATE viagens SET inicio = $1, fim = $2, frete = $3, lucro_total = $4, status = $5, motorista_id = $6, origem = $7, destino = $8 WHERE id = $9`;
-    const params = [inicio, fim, frete, lucro_total, status, motorista_id, origem, destino, id];
+    const sql = `UPDATE viagens SET inicio = $1, fim = $2, frete = $3, lucro_total = $4, status = $5, motorista_id = $6, cliente_id = $7, origem = $8, destino = $9 WHERE id = $10`; // ATUALIZADO PARA 10 PARÂMETROS
+    const params = [inicio, fim, frete, lucro_total, status, motorista_id, cliente_id, origem, destino, id];
     const result = await db.query(sql, params);
 
     if (result.rowCount === 0) {
