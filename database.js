@@ -3,7 +3,7 @@ const { Pool } = require('pg'); // Importa o módulo Pool do driver pg
 // Configuração da conexão com o banco de dados PostgreSQL do Supabase
 // ATENÇÃO: Substitua 'SUA_STRING_DE_CONEXAO_DO_SUPABASE' pela sua string real.
 // Exemplo: 'postgresql://postgres:SUA_SENHA@db.SEU_PROJECT_REF.supabase.co:5432/postgres'
-const connectionString = process.env.DATABASE_URL || "postgresql://postgres.jbahjvyumllenphhavvv:brototransportadora@aws-0-sa-east-1.pooler.supabase.com:5432/postgres";
+const connectionString = process.env.DATABASE_URL || 'SUA_STRING_DE_CONEXAO_DO_SUPABASE';
 
 const pool = new Pool({
   connectionString: connectionString,
@@ -18,11 +18,12 @@ async function initializeDatabase() {
     const client = await pool.connect();
     console.log('Conectado ao banco de dados PostgreSQL com sucesso!');
 
-    // Criação da tabela de caminhões
+    // Criação da tabela de caminhões - NOME ADICIONADO
     await client.query(`
       CREATE TABLE IF NOT EXISTS caminhoes (
         id SERIAL PRIMARY KEY,
         placa VARCHAR(10) NOT NULL UNIQUE,
+        nome TEXT, -- NOVA COLUNA (opcional)
         status_atual VARCHAR(50) DEFAULT 'Disponível'
       );
     `);
@@ -38,7 +39,7 @@ async function initializeDatabase() {
     `);
     console.log('Tabela "motoristas" verificada/criada.');
 
-    // NOVA TABELA: Clientes
+    // Criação da tabela de clientes
     await client.query(`
       CREATE TABLE IF NOT EXISTS clientes (
         id SERIAL PRIMARY KEY,
@@ -50,13 +51,13 @@ async function initializeDatabase() {
     `);
     console.log('Tabela "clientes" verificada/criada.');
 
-    // Tabela de viagens (com nova coluna para cliente)
+    // Tabela de viagens
     await client.query(`
       CREATE TABLE IF NOT EXISTS viagens (
         id SERIAL PRIMARY KEY,
         caminhao_id INTEGER REFERENCES caminhoes(id),
         motorista_id INTEGER REFERENCES motoristas(id),
-        cliente_id INTEGER REFERENCES clientes(id), -- NOVA COLUNA
+        cliente_id INTEGER REFERENCES clientes(id),
         inicio TEXT,
         fim TEXT,
         origem VARCHAR(255),
