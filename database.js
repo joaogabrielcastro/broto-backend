@@ -3,7 +3,7 @@ const { Pool } = require('pg'); // Importa o módulo Pool do driver pg
 // Configuração da conexão com o banco de dados PostgreSQL do Supabase
 // ATENÇÃO: Substitua 'SUA_STRING_DE_CONEXAO_DO_SUPABASE' pela sua string real.
 // Exemplo: 'postgresql://postgres:SUA_SENHA@db.SEU_PROJECT_REF.supabase.co:5432/postgres'
-const connectionString = process.env.DATABASE_URL || 'SUA_STRING_DE_CONEXAO_DO_SUPABASE';
+const connectionString = process.env.DATABASE_URL || "postgresql://postgres.jbahjvyumllenphhavvv:brototransportadora@aws-0-sa-east-1.pooler.supabase.com:5432/postgres";
 
 const pool = new Pool({
   connectionString: connectionString,
