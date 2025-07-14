@@ -94,8 +94,16 @@ app.post("/motoristas", async (req, res) => {
   }
 });
 
-// Listar todos os motoristas - ROTA REMOVIDA
-// app.get("/motoristas", async (req, res) => { ... });
+// Listar todos os motoristas
+app.get("/motoristas", async (req, res) => {
+  try {
+    const result = await db.query("SELECT id, nome, telefone FROM motoristas");
+    res.status(200).json(result.rows);
+  } catch (err) {
+    console.error("Erro no DB ao listar motoristas:", err.message);
+    res.status(500).json({ erro: err.message });
+  }
+});
 
 // Rota para excluir motorista - ROTA REMOVIDA
 // app.delete("/motoristas/:id", async (req, res) => { ... });
