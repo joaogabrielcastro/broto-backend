@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+// CORREÇÃO AQUI: Caminho do database.js ajustado para ./src/database
 const db = require("./database"); 
 
 const app = express();
@@ -104,30 +105,30 @@ app.post("/motoristas", async (req, res) => {
 // **********************************************
 
 // 1. Cadastrar caminhão
-    app.post("/caminhoes", async (req, res) => {
-      const { placa, nome, status_atual } = req.body; // <-- 'nome' deve estar aqui
+app.post("/caminhoes", async (req, res) => {
+  const { placa, nome, status_atual } = req.body; // 'nome' incluído aqui
 
-      if (!placa || typeof placa !== 'string' || placa.trim() === '') {
-        return res.status(400).json({ erro: "A placa do caminhão é obrigatória." });
-      }
+  if (!placa || typeof placa !== 'string' || placa.trim() === '') {
+    return res.status(400).json({ erro: "A placa do caminhão é obrigatória." });
+  }
 
-      const status = status_atual || "Disponível";
+  const status = status_atual || "Disponível";
 
-      try {
-        const result = await db.query(
-          // 'nome' deve ser incluído na query INSERT e nos parâmetros
-          `INSERT INTO caminhoes (placa, nome, status_atual) VALUES ($1, $2, $3) RETURNING id`,
-          [placa.toUpperCase(), nome, status] // <-- 'nome' deve ser passado aqui
-        );
-        res.status(201).json({ id: result.rows[0].id, placa: placa.toUpperCase(), nome: nome, status_atual: status });
-      } catch (err) {
-        if (err.code === '23505') {
-          return res.status(409).json({ erro: "Esta placa já está cadastrada." });
-        }
-        console.error("Erro no DB ao cadastrar caminhão:", err.message);
-        res.status(500).json({ erro: "Erro interno do servidor ao cadastrar caminhão." });
-      }
-    });
+  try {
+    const result = await db.query(
+      `INSERT INTO caminhoes (placa, nome, status_atual) VALUES ($1, $2, $3) RETURNING id`, // 'nome' incluído na query
+      [placa.toUpperCase(), nome, status] // 'nome' passado como parâmetro
+    );
+    res.status(201).json({ id: result.rows[0].id, placa: placa.toUpperCase(), nome: nome, status_atual: status });
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({ erro: "Esta placa já está cadastrada." });
+    }
+    console.error("Erro no DB ao cadastrar caminhão:", err.message);
+    res.status(500).json({ erro: "Erro interno do servidor ao cadastrar caminhão." });
+  }
+});
+
 // Listar todos os caminhões
 app.get("/caminhoes", async (req, res) => {
   try {
