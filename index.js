@@ -1,6 +1,6 @@
 const express = require("express");
 const cors = require("cors");
-const db = require("./database"); 
+const db = require("./src/database"); 
 
 const app = express();
 
@@ -67,7 +67,7 @@ app.get("/clientes", async (req, res) => {
 });
 
 // **********************************************
-// ROTAS PARA MOTORISTAS - ATUALIZADAS (SEM CNH)
+// ROTAS PARA MOTORISTAS - ATUALIZADAS (SEM CNH E SEM LISTAR/EXCLUIR)
 // **********************************************
 
 // 6. Cadastrar motorista - SEM CNH
@@ -90,43 +90,6 @@ app.post("/motoristas", async (req, res) => {
     }
     console.error("Erro no DB ao cadastrar motorista:", err.message);
     res.status(500).json({ erro: "Erro interno do servidor ao cadastrar motorista." });
-  }
-});
-
-// Listar todos os motoristas
-app.get("/motoristas", async (req, res) => {
-  try {
-    const result = await db.query("SELECT id, nome, telefone FROM motoristas");
-    res.status(200).json(result.rows);
-  } catch (err) {
-    console.error("Erro no DB ao listar motoristas:", err.message);
-    res.status(500).json({ erro: err.message });
-  }
-});
-
-// Rota para excluir motorista (mantida)
-app.delete("/motoristas/:id", async (req, res) => {
-  const id = req.params.id;
-
-  if (isNaN(parseInt(id))) {
-    return res.status(400).json({ erro: "ID do motorista inválido." });
-  }
-
-  try {
-    const checkViagens = await db.query(`SELECT COUNT(*) FROM viagens WHERE motorista_id = $1`, [id]);
-    if (parseInt(checkViagens.rows[0].count) > 0) {
-      return res.status(409).json({ erro: "Não é possível excluir o motorista pois ele está associado a viagens." });
-    }
-
-    const result = await db.query(`DELETE FROM motoristas WHERE id = $1`, [id]);
-
-    if (result.rowCount === 0) {
-      return res.status(404).json({ erro: "Motorista não encontrado para exclusão." });
-    }
-    res.status(200).json({ excluido: true, id: id });
-  } catch (err) {
-    console.error("Erro no DB ao excluir motorista:", err.message);
-    res.status(500).json({ erro: "Erro interno do servidor ao excluir motorista." });
   }
 });
 
@@ -162,7 +125,7 @@ app.post("/caminhoes", async (req, res) => {
 // Listar todos os caminhões
 app.get("/caminhoes", async (req, res) => {
   try {
-    const result = await db.query("SELECT * FROM caminhoes");
+    const result = await db.query("SELECT id, placa, nome, status_atual FROM caminhoes");
     res.status(200).json(result.rows);
   } catch (err) {
     console.error("Erro no DB ao listar caminhões:", err.message);
@@ -170,9 +133,9 @@ app.get("/caminhoes", async (req, res) => {
   }
 });
 
-// 2. Cadastrar viagem - ATUALIZADA (SEM LUCRO_TOTAL INICIAL)
+// 2. Cadastrar viagem
 app.post("/viagens", async (req, res) => {
-  let { placa, motorista_id, cliente_id, inicio, fim, origem, destino, frete, data_termino, status } = req.body; // LUCRO_TOTAL REMOVIDO
+  let { placa, motorista_id, cliente_id, inicio, fim, origem, destino, frete, data_termino, status } = req.body;
 
   // Validação de entrada
   if (!placa || typeof placa !== 'string' || placa.trim() === '') {
@@ -199,8 +162,6 @@ app.post("/viagens", async (req, res) => {
   if (isNaN(parseFloat(frete)) || parseFloat(frete) < 0) {
     return res.status(400).json({ erro: "O valor do frete deve ser um número positivo." });
   }
-  // LUCRO_TOTAL REMOVIDO da validação inicial
-  // if (isNaN(parseFloat(lucro_total))) { ... }
   if (!status || typeof status !== 'string' || (status !== 'Em andamento' && status !== 'Finalizada')) {
     return res.status(400).json({ erro: "Status da viagem inválido. Use 'Em andamento' ou 'Finalizada'." });
   }
@@ -208,7 +169,6 @@ app.post("/viagens", async (req, res) => {
   motorista_id = parseInt(motorista_id);
   cliente_id = parseInt(cliente_id);
   frete = parseFloat(frete);
-  // lucro_total = parseFloat(lucro_total); // REMOVIDO
 
   try {
     const caminhaoResult = await db.query(`SELECT id FROM caminhoes WHERE placa = $1`, [placa]);
@@ -227,10 +187,9 @@ app.post("/viagens", async (req, res) => {
       return res.status(404).json({ erro: "Cliente não encontrado para o ID informado." });
     }
 
-    // CUSTOS e LUCRO_TOTAL não são inseridos aqui, custos tem DEFAULT 0
     const result = await db.query(
       `INSERT INTO viagens (caminhao_id, motorista_id, cliente_id, inicio, fim, origem, destino, frete, data_termino, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`, // ATUALIZADO PARA 10 PARÂMETROS
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
       [caminhao_id, motorista_id, cliente_id, inicio, fim, origem, destino, frete, data_termino, status]
     );
     res.status(201).json({ id: result.rows[0].id, caminhao_id, motorista_id, cliente_id, inicio, fim, origem, destino, frete, data_termino, status });
@@ -245,16 +204,16 @@ app.get("/situacao-atual-caminhoes", async (req, res) => {
   const sql = `
     SELECT
       c.placa,
-      c.nome as caminhao_nome, -- NOVO CAMPO
+      c.nome as caminhao_nome,
       v.id as viagem_id,
       v.inicio,
-      v.fim, -- Adicionado para consistência, mesmo que não usado na tela
+      v.fim,
       v.origem,
       v.destino,
-      v.frete, -- Adicionado para consistência
-      v.custos, -- NOVO CAMPO
-      v.lucro_total, -- NOVO CAMPO
-      v.data_termino, -- Adicionado para consistência
+      v.frete,
+      v.custos,
+      v.lucro_total,
+      v.data_termino,
       v.status,
       m.nome as motorista_nome,
       cl.nome as cliente_nome
@@ -277,9 +236,9 @@ app.get("/situacao-atual-caminhoes", async (req, res) => {
 app.get("/viagens-ativas-lista", async (req, res) => {
   const sql = `
     SELECT
-      v.id, v.inicio, v.fim, v.frete, v.custos, v.lucro_total, v.data_termino, v.status, -- CUSTOS E LUCRO
+      v.id, v.inicio, v.fim, v.frete, v.custos, v.lucro_total, v.data_termino, v.status,
       c.placa,
-      c.nome as caminhao_nome, -- NOVO CAMPO
+      c.nome as caminhao_nome,
       m.nome as motorista_nome,
       v.origem,
       v.destino,
@@ -303,9 +262,9 @@ app.get("/viagens-ativas-lista", async (req, res) => {
 app.get("/viagens-finalizadas-lista", async (req, res) => {
   const sql = `
     SELECT
-      v.id, v.inicio, v.fim, v.frete, v.custos, v.lucro_total, v.data_termino, v.status, -- CUSTOS E LUCRO
+      v.id, v.inicio, v.fim, v.frete, v.custos, v.lucro_total, v.data_termino, v.status,
       c.placa,
-      c.nome as caminhao_nome, -- NOVO CAMPO
+      c.nome as caminhao_nome,
       m.nome as motorista_nome,
       v.origem,
       v.destino,
@@ -343,15 +302,15 @@ app.get("/viagens-por-placa/:placa", async (req, res) => {
 
     const sql = `
       SELECT
-        v.id, v.inicio, v.fim, v.frete, v.custos, v.lucro_total, v.data_termino, v.status, -- CUSTOS E LUCRO
+        v.id, v.inicio, v.fim, v.frete, v.custos, v.lucro_total, v.data_termino, v.status,
         v.origem, v.destino,
         m.nome as motorista_nome,
         cl.nome as cliente_nome,
-        c.nome as caminhao_nome -- NOVO CAMPO
+        c.nome as caminhao_nome
       FROM viagens v
       JOIN motoristas m ON v.motorista_id = m.id
       JOIN clientes cl ON v.cliente_id = cl.id
-      JOIN caminhoes c ON v.caminhao_id = c.id -- NOVO JOIN
+      JOIN caminhoes c ON v.caminhao_id = c.id
       WHERE v.caminhao_id = $1
     `;
     const result = await db.query(sql, [caminhao_id]);
@@ -362,37 +321,10 @@ app.get("/viagens-por-placa/:placa", async (req, res) => {
   }
 });
 
-// Nova rota para listar TODAS as viagens (se necessário para algum dashboard, etc.)
-/*
-app.get("/viagens/todas", async (req, res) => {
-  const sql = `
-    SELECT
-      v.id, v.inicio, v.fim, v.frete, v.custos, v.lucro_total, v.data_termino, v.status,
-      c.placa,
-      c.nome as caminhao_nome,
-      m.nome as motorista_nome,
-      v.origem,
-      v.destino,
-      cl.nome as cliente_nome
-    FROM viagens v
-    JOIN caminhoes c ON v.caminhao_id = c.id
-    JOIN motoristas m ON v.motorista_id = m.id
-    JOIN clientes cl ON v.cliente_id = cl.id
-  `;
-  try {
-    const result = await db.query(sql);
-    res.status(200).json(result.rows);
-  } catch (err) {
-    console.error("Erro no DB ao listar todas as viagens:", err.message);
-    res.status(500).json({ erro: "Erro interno do servidor ao listar todas as viagens." });
-  }
-});
-*/
-
 // Editar viagem (PUT) - ATUALIZADA com custos e cliente_id
 app.put("/viagens/:id", async (req, res) => {
   const id = req.params.id;
-  let { inicio, fim, frete, custos, lucro_total, status, motorista_id, cliente_id, origem, destino } = req.body; // CUSTOS ADICIONADO
+  let { inicio, fim, frete, custos, lucro_total, status, motorista_id, cliente_id, origem, destino } = req.body;
 
   // Validação de entrada
   if (isNaN(parseInt(id))) {
@@ -407,11 +339,9 @@ app.put("/viagens/:id", async (req, res) => {
   if (isNaN(parseFloat(frete)) || parseFloat(frete) < 0) {
     return res.status(400).json({ erro: "O valor do frete deve ser um número positivo." });
   }
-  if (isNaN(parseFloat(custos)) || parseFloat(custos) < 0) { // VALIDAÇÃO DE CUSTOS
+  if (isNaN(parseFloat(custos)) || parseFloat(custos) < 0) {
     return res.status(400).json({ erro: "O valor dos custos deve ser um número positivo." });
   }
-  // LUCRO_TOTAL não é validado aqui, pois será calculado
-  // if (isNaN(parseFloat(lucro_total))) { ... }
   if (!status || typeof status !== 'string' || (status !== 'Em andamento' && status !== 'Finalizada')) {
     return res.status(400).json({ erro: "Status da viagem inválido. Use 'Em andamento' ou 'Finalizada'." });
   }
@@ -431,8 +361,8 @@ app.put("/viagens/:id", async (req, res) => {
   motorista_id = parseInt(motorista_id);
   cliente_id = parseInt(cliente_id);
   frete = parseFloat(frete);
-  custos = parseFloat(custos); // Converte custos
-  lucro_total = frete - custos; // CALCULA LUCRO_TOTAL
+  custos = parseFloat(custos);
+  lucro_total = frete - custos;
 
   try {
     const motoristaResult = await db.query(`SELECT id FROM motoristas WHERE id = $1`, [motorista_id]);
@@ -444,7 +374,7 @@ app.put("/viagens/:id", async (req, res) => {
       return res.status(404).json({ erro: "Cliente não encontrado para o ID fornecido na edição." });
     }
 
-    const sql = `UPDATE viagens SET inicio = $1, fim = $2, frete = $3, custos = $4, lucro_total = $5, status = $6, motorista_id = $7, cliente_id = $8, origem = $9, destino = $10 WHERE id = $11`; // ATUALIZADO PARA 11 PARÂMETROS
+    const sql = `UPDATE viagens SET inicio = $1, fim = $2, frete = $3, custos = $4, lucro_total = $5, status = $6, motorista_id = $7, cliente_id = $8, origem = $9, destino = $10 WHERE id = $11`;
     const params = [inicio, fim, frete, custos, lucro_total, status, motorista_id, cliente_id, origem, destino, id];
     const result = await db.query(sql, params);
 
@@ -461,25 +391,24 @@ app.put("/viagens/:id", async (req, res) => {
 // Concluir viagem (muda status para Finalizada) - ATUALIZADA com custos e lucro_total
 app.patch("/viagens/:id/finalizar", async (req, res) => {
   const id = req.params.id;
-  const { custos } = req.body; // Recebe custos para calcular lucro_total
+  const { custos } = req.body;
 
   if (isNaN(parseInt(id))) {
     return res.status(400).json({ erro: "ID da viagem inválido." });
   }
-  if (isNaN(parseFloat(custos)) || parseFloat(custos) < 0) { // Validação de custos
+  if (isNaN(parseFloat(custos)) || parseFloat(custos) < 0) {
     return res.status(400).json({ erro: "O valor dos custos é obrigatório para finalizar a viagem." });
   }
 
   try {
-    // Primeiro, buscar frete da viagem para calcular lucro_total
     const viagemResult = await db.query(`SELECT frete FROM viagens WHERE id = $1`, [id]);
     if (viagemResult.rows.length === 0) {
       return res.status(404).json({ erro: "Viagem não encontrada para finalizar." });
     }
     const freteViagem = parseFloat(viagemResult.rows[0].frete);
-    const lucro_total = freteViagem - parseFloat(custos); // CALCULA LUCRO_TOTAL
+    const lucro_total = freteViagem - parseFloat(custos);
 
-    const sql = `UPDATE viagens SET status = 'Finalizada', custos = $1, lucro_total = $2 WHERE id = $3`; // ATUALIZADO
+    const sql = `UPDATE viagens SET status = 'Finalizada', custos = $1, lucro_total = $2 WHERE id = $3`;
     const result = await db.query(sql, [parseFloat(custos), lucro_total, id]);
 
     if (result.rowCount === 0) {
@@ -517,9 +446,6 @@ app.delete("/motoristas/:id", async (req, res) => {
     res.status(500).json({ erro: "Erro interno do servidor ao excluir motorista." });
   }
 });
-
-// Rota para excluir viagem (REMOVIDA)
-// app.delete("/viagens/:id", async (req, res) => { ... });
 
 
 // Middleware de tratamento de erros genérico (captura erros não tratados em rotas)
